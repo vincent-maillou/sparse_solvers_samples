@@ -43,41 +43,45 @@ def generate_bta_matrix(
         A[-a:, i * b : (i + 1) * b] = sp.random(a, b, density=sparsity, format="lil")
         A[i * b : (i + 1) * b, -a:] = sp.random(b, a, density=sparsity, format="lil")
     # Arrow tip block
-    A[-a:, -a:] = np.random.rand(a, a)
+    A[-a:, -a:] = sp.random(a, a, density=sparsity, format="lil")
+    if ensure_diag:
+        A[-a:, -a:] += np.diag(np.random.rand(a))
 
     return A.tocsr()
 
 
-# def generate_ba_matrix(
-#     m: int, bwd: int, a: int, sparsity: float = 1.0, ensure_diag: bool = True
-# ):
-#     """Generate a banded with arrowhead matrix.
+def generate_ba_matrix(
+    m: int, bwd: int, a: int, sparsity: float = 1.0, ensure_diag: bool = True
+):
+    """Generate a banded with arrowhead matrix.
 
-#     Parameters
-#     ----------
-#     m : int
-#         Size of the matrix.
-#     bwd : int
-#         Bandwidth of the matrix.
-#     a : int
-#         Size of the arrowhead blocks.
-#     sparsity : float (default: 1.0)
-#         Density of matrix.
-#     ensure_diag : bool (default: True)
-#         Ensure that the diagonal elements of the matrix are non-null.
-#     """
+    Parameters
+    ----------
+    m : int
+        Size of the matrix.
+    bwd : int
+        Bandwidth of the matrix.
+    a : int
+        Size of the arrowhead blocks.
+    sparsity : float (default: 1.0)
+        Density of matrix.
+    ensure_diag : bool (default: True)
+        Ensure that the diagonal elements of the matrix are non-null.
+    """
+    h_bwd = bwd // 2
+    A = sp.lil_matrix((m, m))
+    for i in range(m):
+        # Band at row i
+        A[i, max(0, i - h_bwd) : min(m, i + h_bwd + 1)] = sp.random(
+            1, min(m, i + h_bwd + 1) - max(0, i - h_bwd), density=sparsity, format="lil"
+        )
+        if ensure_diag:
+            A[i, i] += np.random.rand(1)
+        # Arrow block
+        A[-a:, i] = sp.random(a, 1, density=sparsity, format="lil")
+        A[i, -a:] = sp.random(1, a, density=sparsity, format="lil")
 
-#     A = sp.lil_matrix((m, m))
-#     for i in range(m):
-#         # Band at row i
-#         A[i, max(0, i - bwd) : min(m, i + bwd + 1)] = sp.random(
-#             1, 2 * bwd + 1, density=sparsity, format="lil"
-#         )
-#         if ensure_diag:
-#             A[i, i] += np.random.rand()
-#         # Arrow block
-#         A[-a:, i] = sp.random(a, 1, density=sparsity, format="lil")
-#         A[i, -a:] = sp.random(1, a, density=sparsity, format="lil")
+    return A.tocsr()
 
 
 def make_diagonaly_dominant(A: sp.csr_matrix):
@@ -106,8 +110,10 @@ if __name__ == "__main__":
     n = 10
     b = 10
     a = 5
+    m = n * b + a
 
-    A = generate_bta_matrix(n, b, a, sparsity=0.1, ensure_diag=True)
+    # A = generate_bta_matrix(n, b, a, sparsity=0.1, ensure_diag=True)
+    A = generate_ba_matrix(m, b, a, sparsity=0.15, ensure_diag=True)
     make_diagonaly_dominant(A)
     symmetrize(A)
 
