@@ -77,7 +77,8 @@ if __name__ == "__main__":
 
     n, nnz, row, col, data = load_coo("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128_mumps.dat")
     print(n, nnz)
-    print(row[0:10])
-    print(col[0:10])
-    print(data[0:10])
+    n_elem = 10
+    print(row[0:n_elem])
+    print(col[0:n_elem])
+    print(data[0:n_elem])
     plot_spy_coo(n, nnz, row, col, data, "spy_plot.png")

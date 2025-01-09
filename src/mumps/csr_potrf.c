@@ -32,33 +32,43 @@ int main(int argc, char **argv) {
     // Load the CSC matrix
     load_sym_coo("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128_mumps.dat", &n, &nnz, &row, &col, &data);
 
-    // Debug prints
-    if (myid == 0) {
-        printf("Matrix dimensions: n = %d, nnz = %d\n", n, nnz);
-    }
-
-    // Print the first 10 elements of the CSC arrays
+    // Print the first n_elem elements of the CSC arrays
+    int n_elem = 10;
     if (myid == 0) {
         printf("row: ");
-        for (int32_t i = 0; i < 10; i++) {
+        for (int32_t i = 0; i < n_elem; i++) {
             printf("%d ", row[i]);
         }
         printf("\n");
 
         printf("col: ");
-        for (int32_t i = 0; i < 10; i++) {
+        for (int32_t i = 0; i < n_elem; i++) {
             printf("%d ", col[i]);
         }
         printf("\n");
 
         printf("data: ");
-        for (int32_t i = 0; i < 10; i++) {
+        for (int32_t i = 0; i < n_elem; i++) {
             printf("%f ", data[i]);
         }
         printf("\n");
     }
 
-    /*
+    // Print all the diagonal elements
+    if (myid == 0) {
+        printf("Diagonal elements: ");
+        for (int32_t i = 0; i < n; i++) {
+            for (int32_t j = 0; j < nnz; j++) {
+                if (row[j] == i && col[j] == i) {
+                    printf("%f ", data[j]);
+                    break;
+                }
+            }
+        }
+        printf("\n");
+    }
+
+    
     // Allocate memory for the right-hand-side vector (identity matrix)
     rhs = (double *)malloc(n * sizeof(double));
     for (int32_t i = 0; i < n; i++) {
@@ -93,6 +103,8 @@ int main(int argc, char **argv) {
     // id.ICNTL(30) = 1; // Enable selected inversion
     id.ICNTL(5) = 0;
     id.ICNTL(18) = 0;
+
+    id.ICNTL(7) = 5; // Ordering method
     
     // Ordering phase
     printf("Start ordering phase on process %d\n", myid);
@@ -115,6 +127,8 @@ int main(int argc, char **argv) {
     }
     printf("Ordering phase completed on process %d in %f seconds\n", myid, elapsed_time);
     
+
+    
     // Factorization phase
     printf("Start factorization phase on process %d\n", myid);
     start_time = MPI_Wtime(); // Start timing
@@ -129,6 +143,8 @@ int main(int argc, char **argv) {
     }
     printf("Factorization phase completed on process %d in %f seconds\n", myid, elapsed_time);
     
+    
+    /*
     // Solve phase
     printf("Start solving phase on process %d\n", myid);
     id.job = 3;
@@ -146,11 +162,12 @@ int main(int argc, char **argv) {
             printf("%f\n", rhs[i]);
         }
     }
+    */
 
     // Terminate MUMPS
     id.job = JOB_END;
     dmumps_c(&id);
-    */
+    
 
     // Free allocated memory
     free(row);
@@ -166,16 +183,16 @@ int main(int argc, char **argv) {
 
 
 void load_sym_coo(const char *filename, int32_t *n, int32_t *nnz, int32_t **row, int32_t **col, double **data) {
-    FILE *file = fopen(filename, "r");
+    FILE *file = fopen(filename, "rb");
     if (!file) {
         perror("Error opening file");
         exit(EXIT_FAILURE);
     }
 
     // Read the number of rows/columns and number of non-zero elements
-    fscanf(file, "%d", n);
-    fscanf(file, "%d", n); // Assuming the file repeats the dimension
-    fscanf(file, "%d", nnz);
+    fread(n, sizeof(int32_t), 1, file);
+    fread(n, sizeof(int32_t), 1, file); // Assuming the file repeats the dimension
+    fread(nnz, sizeof(int32_t), 1, file);
 
     // Allocate memory for CSC arrays
     *row = (int32_t *)malloc(*nnz * sizeof(int32_t));
@@ -188,29 +205,16 @@ void load_sym_coo(const char *filename, int32_t *n, int32_t *nnz, int32_t **row,
     int32_t data_size = *nnz * sizeof(double);
     int32_t total_size = row_size + col_size + data_size;
 
-    printf("Allocated memory for matrix:\n");
+    printf("Allocated memory for matrix dimensions: n = %d, nnz = %d\n", *n, *nnz);
     printf("  row: %zu bytes\n", row_size);
     printf("  col: %zu bytes\n", col_size);
     printf("  data: %zu bytes\n", data_size);
     printf("  Total: %zu bytes (%.2f MB)\n", total_size, total_size / (1024.0 * 1024.0));
 
-    // Read the CSC arrays from the file
-    for (int32_t i = 0; i < *nnz; i++) {
-        fscanf(file, "%d", &(*col)[i]);
-        (*col)[i] += 1; // Convert to 1-based indexing
-        // printf("%d ", (*col)[i]);
-    }
-
-    for (int32_t i = 0; i < *nnz; i++) {
-        fscanf(file, "%d", &(*row)[i]);
-        (*row)[i] += 1; // Convert to 1-based indexing
-        // printf("%d ", (*row)[i]);
-    }
-
-    for (int32_t i = 0; i < *nnz; i++) {
-        fscanf(file, "%lf", &(*data)[i]);
-        // printf("%f ", (*data)[i]);
-    }
+    // Read the COO arrays from the file
+    fread(*row, sizeof(int32_t), *nnz, file);
+    fread(*col, sizeof(int32_t), *nnz, file);
+    fread(*data, sizeof(double), *nnz, file);
 
     fclose(file);
 }
