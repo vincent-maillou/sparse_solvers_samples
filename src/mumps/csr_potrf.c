@@ -11,13 +11,13 @@
 // Define the ICNTL macro to access the icntl array
 #define ICNTL(I) icntl[(I)-1]
 
-void load_sym_csc(const char *filename, int32_t *n, int32_t *nnz, int32_t **ia, int32_t **ja, double **a);
+void load_sym_coo(const char *filename, int32_t *n, int32_t *nnz, int32_t **row, int32_t **col, double **data);
 
 int main(int argc, char **argv) {
     DMUMPS_STRUC_C id;
     int32_t n, nnz;
-    int32_t *ia, *ja;
-    double *a;
+    int32_t *row, *col;
+    double *data;
     double *rhs;
     int myid, ierr;
 
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
     ierr = MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
     // Load the CSC matrix
-    load_sym_csc("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns2865_nt365_nss0_nb4_n1045729.dat", &n, &nnz, &ia, &ja, &a);
+    load_sym_coo("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128_mumps.dat", &n, &nnz, &row, &col, &data);
 
     // Debug prints
     if (myid == 0) {
@@ -39,25 +39,26 @@ int main(int argc, char **argv) {
 
     // Print the first 10 elements of the CSC arrays
     if (myid == 0) {
-        printf("ia: ");
+        printf("row: ");
         for (int32_t i = 0; i < 10; i++) {
-            printf("%d ", ia[i]);
+            printf("%d ", row[i]);
         }
         printf("\n");
 
-        printf("ja: ");
+        printf("col: ");
         for (int32_t i = 0; i < 10; i++) {
-            printf("%d ", ja[i]);
+            printf("%d ", col[i]);
         }
         printf("\n");
 
-        printf("a: ");
+        printf("data: ");
         for (int32_t i = 0; i < 10; i++) {
-            printf("%f ", a[i]);
+            printf("%f ", data[i]);
         }
         printf("\n");
     }
 
+    /*
     // Allocate memory for the right-hand-side vector (identity matrix)
     rhs = (double *)malloc(n * sizeof(double));
     for (int32_t i = 0; i < n; i++) {
@@ -75,22 +76,24 @@ int main(int argc, char **argv) {
     if (myid == 0) {
         id.n = n;
         id.nnz = nnz;
-        id.irn = ia;
-        id.jcn = ja;
-        id.a = a;
+        id.irn = row;
+        id.jcn = col;
+        id.a = data;
         id.rhs = rhs;
     }
     
     // Set MUMPS parameters
-    id.ICNTL(1) = 6; // Output stream for error messages
-    id.ICNTL(2) = 6; // Output stream for diagnostic printing
+    id.ICNTL(1) = 6; // Error messages (6 default std::out)
+    id.ICNTL(2) = 6; // Warning messages (6 default std::out)
     id.ICNTL(3) = 6; // Output stream for global information
-    id.ICNTL(4) = 4; // Output stream for statistics
+    // id.ICNTL(4) = 4; // Output stream for statistics
+    id.ICNTL(13) = 0; // Cholesky instead of LDL^T
     // id.ICNTL(14) = 100; // Increase workspace by 20%
     // id.ICNTL(22) = 1; // Enable out-of-core option
     // id.ICNTL(30) = 1; // Enable selected inversion
+    id.ICNTL(5) = 0;
+    id.ICNTL(18) = 0;
     
-    /*
     // Ordering phase
     printf("Start ordering phase on process %d\n", myid);
     start_time = MPI_Wtime(); // Start timing
@@ -111,7 +114,7 @@ int main(int argc, char **argv) {
         }
     }
     printf("Ordering phase completed on process %d in %f seconds\n", myid, elapsed_time);
-
+    
     // Factorization phase
     printf("Start factorization phase on process %d\n", myid);
     start_time = MPI_Wtime(); // Start timing
@@ -143,16 +146,16 @@ int main(int argc, char **argv) {
             printf("%f\n", rhs[i]);
         }
     }
-    */
 
     // Terminate MUMPS
     id.job = JOB_END;
     dmumps_c(&id);
+    */
 
     // Free allocated memory
-    free(ia);
-    free(ja);
-    free(a);
+    free(row);
+    free(col);
+    free(data);
     free(rhs);
 
     // Finalize MPI
@@ -162,7 +165,7 @@ int main(int argc, char **argv) {
 }
 
 
-void load_sym_csc(const char *filename, int32_t *n, int32_t *nnz, int32_t **ia, int32_t **ja, double **a) {
+void load_sym_coo(const char *filename, int32_t *n, int32_t *nnz, int32_t **row, int32_t **col, double **data) {
     FILE *file = fopen(filename, "r");
     if (!file) {
         perror("Error opening file");
@@ -175,33 +178,38 @@ void load_sym_csc(const char *filename, int32_t *n, int32_t *nnz, int32_t **ia, 
     fscanf(file, "%d", nnz);
 
     // Allocate memory for CSC arrays
-    *ia = (int32_t *)malloc((*n + 1) * sizeof(int32_t));
-    *ja = (int32_t *)malloc(*nnz * sizeof(int32_t));
-    *a = (double *)malloc(*nnz * sizeof(double));
+    *row = (int32_t *)malloc(*nnz * sizeof(int32_t));
+    *col = (int32_t *)malloc(*nnz * sizeof(int32_t));
+    *data = (double *)malloc(*nnz * sizeof(double));
 
     // Calculate and print the allocated memory for the matrix
-    int32_t ia_size = (*n + 1) * sizeof(int32_t);
-    int32_t ja_size = *nnz * sizeof(int32_t);
-    int32_t a_size = *nnz * sizeof(double);
-    int32_t total_size = ia_size + ja_size + a_size;
+    int32_t row_size = *nnz * sizeof(int32_t);
+    int32_t col_size = *nnz * sizeof(int32_t);
+    int32_t data_size = *nnz * sizeof(double);
+    int32_t total_size = row_size + col_size + data_size;
 
     printf("Allocated memory for matrix:\n");
-    printf("  ia: %zu bytes\n", ia_size);
-    printf("  ja: %zu bytes\n", ja_size);
-    printf("  a: %zu bytes\n", a_size);
+    printf("  row: %zu bytes\n", row_size);
+    printf("  col: %zu bytes\n", col_size);
+    printf("  data: %zu bytes\n", data_size);
     printf("  Total: %zu bytes (%.2f MB)\n", total_size, total_size / (1024.0 * 1024.0));
 
     // Read the CSC arrays from the file
     for (int32_t i = 0; i < *nnz; i++) {
-        fscanf(file, "%d", &(*ja)[i]);
-    }
-
-    for (int32_t i = 0; i < *n + 1; i++) {
-        fscanf(file, "%d", &(*ia)[i]);
+        fscanf(file, "%d", &(*col)[i]);
+        (*col)[i] += 1; // Convert to 1-based indexing
+        // printf("%d ", (*col)[i]);
     }
 
     for (int32_t i = 0; i < *nnz; i++) {
-        fscanf(file, "%lf", &(*a)[i]);
+        fscanf(file, "%d", &(*row)[i]);
+        (*row)[i] += 1; // Convert to 1-based indexing
+        // printf("%d ", (*row)[i]);
+    }
+
+    for (int32_t i = 0; i < *nnz; i++) {
+        fscanf(file, "%lf", &(*data)[i]);
+        // printf("%f ", (*data)[i]);
     }
 
     fclose(file);

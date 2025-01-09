@@ -101,6 +101,7 @@ def save_csr_matrix(filename: str, A: sp.csr_matrix):
 
     with open(filename, 'wb') as f:
         f.write(n.to_bytes(4, byteorder='little'))
+        f.write(n.to_bytes(4, byteorder='little'))
         f.write(nnz.to_bytes(4, byteorder='little'))
         f.write(ia.tobytes())
         f.write(ja.tobytes())
