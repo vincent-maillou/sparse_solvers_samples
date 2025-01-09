@@ -44,8 +44,8 @@ def save_coo_bin(A: sp.coo_matrix, filename: str):
 
 
 if __name__ == "__main__":
-    # n, nnz, ia, ja, a = load_sym_csc("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns2865_nt365_nss0_nb4_n1045729.dat")
-    n, nnz, ia, ja, a = load_sym_csc("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128.dat")
+    n, nnz, ia, ja, a = load_sym_csc("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns2865_nt365_nss0_nb4_n1045729.dat")
+    # n, nnz, ia, ja, a = load_sym_csc("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128.dat")
     
     A_csc = sp.csc_matrix((a, ja, ia), shape=(n, n))
     A_coo = A_csc.tocoo()
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     A_coo_upper = sp.coo_matrix((data, (row, col)), shape=(n, n)) """
 
     # Save the COO matrix to a binary file
-    # save_coo_bin(A_coo_upper, "/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns2865_nt365_nss0_nb4_n1045729_mumps.dat")
-    save_coo_bin(A_coo, "/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128_mumps.dat")
+    save_coo_bin(A_coo, "/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns2865_nt365_nss0_nb4_n1045729_mumps.dat")
+    # save_coo_bin(A_coo, "/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128_mumps.dat")
 
 
