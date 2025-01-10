@@ -32,17 +32,14 @@ int main(int argc, char **argv) {
     MUMPS_INT8 nnz;
     MUMPS_INT *row, *col;
     double *data;
-    double *rhs;
 
     // Load the CSC matrix
-    // load_sym_coo("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns2865_nt365_nss0_nb4_n1045729_mumps.dat", &n, &nnz, &row, &col, &data);
-    load_sym_coo("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128_mumps.dat", &n, &nnz, &row, &col, &data);
+    load_sym_coo("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns2865_nt365_nss0_nb4_n1045729_mumps.dat", &n, &nnz, &row, &col, &data);
+    // load_sym_coo("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128_mumps.dat", &n, &nnz, &row, &col, &data);
 
     // Sparse rhs for selected-inversion
-    // MUMPS_INT8 nz_rhs = nnz; // Total entries to be computed
-    MUMPS_INT8 nz_rhs; // Total entries to be computed
-    // MUMPS_INT nrhs = n; // Number of columns of A^-1
-    MUMPS_INT nrhs; // Number of columns of A^-1
+    MUMPS_INT8 nz_rhs; // Total entries to be computed: nz_rhs = nnz
+    MUMPS_INT nrhs; // Number of columns of A^-1: nrhs = n
     MUMPS_INT *irhs_ptr; // Pointers to the columns
     MUMPS_INT *irhs_sparse; // Array of row indices
     
@@ -51,8 +48,30 @@ int main(int argc, char **argv) {
     // irhs_sparse = (MUMPS_INT *)malloc(nz_rhs * sizeof(MUMPS_INT));
 
     // coo_to_csc(n, nz_rhs, row, col, data, &irhs_sparse, &irhs_ptr);
-    load_sym_csc("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128_mumps.dat", &nrhs, &nz_rhs, &irhs_sparse, &irhs_ptr);
-    double *rhs_sparse = (double *)malloc(nnz * sizeof(double)); // Array of values
+    load_sym_csc("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns2865_nt365_nss0_nb4_n1045729.dat", &nrhs, &nz_rhs, &irhs_sparse, &irhs_ptr);
+    // load_sym_csc("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128.dat", &nrhs, &nz_rhs, &irhs_sparse, &irhs_ptr);
+    double *rhs_sparse = (double *)malloc(nz_rhs * sizeof(double)); // Array of values
+
+    // print nz_rhs and nrhs
+    if (myid == 0) {
+        printf("nz_rhs: %lld\n", nz_rhs);
+        printf("nrhs: %d\n", nrhs);
+    }
+
+    /* // Print the last 10 elements of irhs_ptr
+    if (myid == 0) {
+        printf("irhs_ptr: ");
+        for (size_t i = nrhs - 10; i < nrhs + 1; i++) {
+            printf("%d ", irhs_ptr[i]);
+        }
+        printf("\n");
+
+        printf("irhs_sparse: ");
+        for (size_t i = nz_rhs - 10; i < nz_rhs; i++) {
+            printf("%d ", irhs_sparse[i]);
+        }
+        printf("\n");
+    } */
 
     // Print the first n_elem elements of the CSC arrays
     int n_elem = 10;
@@ -89,13 +108,6 @@ int main(int argc, char **argv) {
         }
         printf("\n");
     } */
-
-    
-    // Allocate memory for the right-hand-side vector (identity matrix)
-    rhs = (double *)malloc(n * sizeof(double));
-    for (size_t i = 0; i < n; i++) {
-        rhs[i] = 1.0; // Diagonal ones
-    }
 
     // Initialize MUMPS
     id.comm_fortran = USE_COMM_WORLD;
@@ -182,7 +194,7 @@ int main(int argc, char **argv) {
                myid, id.infog[0], id.infog[1]);
         MPI_Abort(MPI_COMM_WORLD, id.infog[0]);
     }
-    printf("Factorization phase completed on process %d in %f seconds\n", myid, elapsed_time);
+    printf("Solving phase completed on process %d in %f seconds\n", myid, elapsed_time);
    
     
     // // Print the selected entries of the inverse
@@ -203,7 +215,6 @@ int main(int argc, char **argv) {
     free(row);
     free(col);
     free(data);
-    free(rhs);
 
     free(irhs_ptr);
     free(irhs_sparse);
@@ -275,6 +286,48 @@ void load_sym_coo(const char *filename, MUMPS_INT *n, MUMPS_INT8 *nnz, MUMPS_INT
     fclose(file);
 }
 
+
+void load_sym_csc(const char *filename, MUMPS_INT *n, MUMPS_INT8 *nnz, MUMPS_INT **row_indices, MUMPS_INT **col_pointers) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+
+    int temp_n, temp_nnz;
+
+    // Read the number of rows/columns and number of non-zero elements
+    fscanf(file, "%d", &temp_n);
+    fscanf(file, "%d", &temp_n); // Assuming the file repeats the dimension
+    fscanf(file, "%d", &temp_nnz);
+
+    // Print temp_n and temp_nnz
+    printf("temp_n: %d\n", temp_n);
+    printf("temp_nnz: %d\n", temp_nnz);
+
+    // Cast to MUMPS datatype
+    *n = (MUMPS_INT)temp_n;
+    *nnz = (MUMPS_INT8)temp_nnz;
+
+    // Allocate memory for CSC arrays
+    *row_indices = (MUMPS_INT *)malloc(*nnz * sizeof(MUMPS_INT));
+    *col_pointers = (MUMPS_INT *)malloc((*n + 1) * sizeof(MUMPS_INT));
+
+    // Read the row indices
+    for (size_t i = 0; i < *nnz; i++) {
+        fscanf(file, "%d", &temp_n);
+        (*row_indices)[i] = (MUMPS_INT)(temp_n + 1); // Convert to 1-based indexing
+    }
+
+    // Read the column pointers
+    for (size_t i = 0; i < *n + 1; i++) {
+        fscanf(file, "%d", &temp_n);
+        (*col_pointers)[i] = (MUMPS_INT)(temp_n + 1); // Convert to 1-based indexing
+    }
+
+    fclose(file);
+}
+
 void coo_to_csc(int n, int nnz, int *row, int *col, double *data, int **row_indices, int **col_pointers) {
     // Allocate memory for CSC arrays
     *row_indices = (int *)malloc(nnz * sizeof(int));
@@ -321,51 +374,4 @@ void coo_to_csc(int n, int nnz, int *row, int *col, double *data, int **row_indi
     // Free temporary arrays
     free(col_counts);
     free(current_position);
-}
-
-void load_sym_csc(const char *filename, MUMPS_INT *n, MUMPS_INT8 *nnz, MUMPS_INT **row_indices, MUMPS_INT **col_pointers) {
-    FILE *file = fopen(filename, "rb");
-    if (!file) {
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
-    }
-
-    int32_t temp_n, temp_nnz;
-
-    // Read the number of rows/columns and number of non-zero elements
-    fread(&temp_n, sizeof(int32_t), 1, file);
-    fread(&temp_n, sizeof(int32_t), 1, file); // Assuming the file repeats the dimension
-    fread(&temp_nnz, sizeof(int32_t), 1, file);
-
-    // Cast to MUMPS datatype
-    *n = (MUMPS_INT)temp_n;
-    *nnz = (MUMPS_INT8)temp_nnz;
-
-    // Allocate memory for temporary int32_t arrays
-    int32_t *temp_row = (int32_t *)malloc(*nnz * sizeof(int32_t));
-    int32_t *temp_col = (int32_t *)malloc((*n + 1) * sizeof(int32_t));
-
-    // Read the COO arrays from the file into temporary arrays
-    fread(temp_row, sizeof(int32_t), *nnz, file);
-    fread(temp_col, sizeof(int32_t), *n + 1, file);
-
-    
-    // Allocate memory for CSC arrays
-    *row_indices = (MUMPS_INT *)malloc(*nnz * sizeof(MUMPS_INT));
-    *col_pointers = (MUMPS_INT *)malloc((*n + 1) * sizeof(MUMPS_INT));
-
-    
-    // Convert temporary arrays to MUMPS_INT arrays
-    for (size_t i = 0; i < *nnz; i++) {
-        // Also convert to 0-based to 1-based indexing
-        (*row_indices)[i] = (MUMPS_INT)(temp_row[i]+1);
-    } 
-
-    for (size_t i = 0; i < *n + 1; i++) {
-        // Also convert to 0-based to 1-based indexing
-        (*col_pointers)[i] = (MUMPS_INT)(temp_col[i]+1);
-    } 
-   
-
-    fclose(file);
 }

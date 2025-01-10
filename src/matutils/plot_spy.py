@@ -68,17 +68,17 @@ def plot_spy_coo(n, nnz, row, col, data, output_filename):
 
 if __name__ == "__main__":
     # n, nnz, ia, ja, a = load_sym_csc("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns2865_nt365_nss0_nb4_n1045729.dat")
-    # n, nnz, ia, ja, a = load_sym_csc("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128.dat")
-    # print(n, nnz)
-    # print(ia[0:10])
-    # print(ja[0:10])
-    # print(a[0:10])
+    n, nnz, ia, ja, a = load_sym_csc("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128.dat")
+    print(n, nnz)
+    print(ia[0:10])
+    print(ja[0:10])
+    print(a[0:10])
     # plot_spy_csc(n, nnz, ia, ja, a, "spy_plot.png")
 
-    n, nnz, row, col, data = load_coo("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128_mumps.dat")
-    print(n, nnz)
-    n_elem = 10
-    print(row[0:n_elem])
-    print(col[0:n_elem])
-    print(data[0:n_elem])
-    plot_spy_coo(n, nnz, row, col, data, "spy_plot.png")
+    # n, nnz, row, col, data = load_coo("/capstor/scratch/cscs/vmaillou/data/bta_dataset/Qxy_ns42_nt3_nss0_nb2_n128_mumps.dat")
+    # print(n, nnz)
+    # n_elem = 10
+    # print(row[0:n_elem])
+    # print(col[0:n_elem])
+    # print(data[0:n_elem])
+    # plot_spy_coo(n, nnz, row, col, data, "spy_plot.png")
